@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لعبة صالح اللي بيصير مشهور قريبًا</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #70c5ce;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      background-color: #70c5ce;
+      display: block;
+    }
+    #startScreen {
+      position: absolute;
+      text-align: center;
+      color: black;
+      font-size: 24px;
+      z-index: 10;
+    }
+    #startScreen button {
+      font-size: 20px;
+      padding: 10px 20px;
+      margin: 10px;
+      cursor: pointer;
+      background-color: #fff;
+      border: none;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+    #startScreen button:hover {
+      background-color: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <div id="startScreen">
+    <h1>لعبة صالح اللي بيصير مشهور قريبًا</h1>
+    <p>Choose Difficulty:</p>
+    <button id="easyBtn">Easy</button>
+    <button id="mediumBtn">Medium</button>
+    <button id="hardBtn">Hard</button>
+  </div>
+  <canvas id="flappyBirdGame" width="320" height="480"></canvas>
+  <script>
+    const canvas = document.getElementById('flappyBirdGame');
+    const ctx = canvas.getContext('2d');
+
+    let GRAVITY, FLAP, SPAWN_RATE, PIPE_SPEED, PIPE_SPACING, birdY, birdVelocity, birdFlap;
+    let pipes, frame, score, gameOverFlag;
+
+    const PIPE_WIDTH = 50;
+    const BIRD_WIDTH = 20;
+    const BIRD_HEIGHT = 20;
+
+    // شاشة البداية
+    const startScreen = document.getElementById('startScreen');
+    
+    // إعدادات الصعوبة
+    function setDifficulty(difficulty) {
+      if (difficulty === 'easy') {
+        GRAVITY = 0.3;
+        FLAP = -8;
+        SPAWN_RATE = 150;
+        PIPE_SPEED = 1;
+        PIPE_SPACING = 200; // المسافة بين الأنابيب ثابتة
+      } else if (difficulty === 'medium') {
+        GRAVITY = 0.5;
+        FLAP = -10;
+        SPAWN_RATE = 120;
+        PIPE_SPEED = 2;
+        PIPE_SPACING = 200;
+      } else if (difficulty === 'hard') {
+        GRAVITY = 0.7;
+        FLAP = -12;
+        SPAWN_RATE = 100;
+        PIPE_SPEED = 3;
+        PIPE_SPACING = 200;
+      }
+
+      startScreen.style.display = 'none'; // إخفاء شاشة البداية
+      restartGame(); // بدء اللعبة
+    }
+
+    document.getElementById('easyBtn').addEventListener('click', () => setDifficulty('easy'));
+    document.getElementById('mediumBtn').addEventListener('click', () => setDifficulty('medium'));
+    document.getElementById('hardBtn').addEventListener('click', () => setDifficulty('hard'));
+
+    // إعادة تشغيل اللعبة
+    function restartGame() {
+      birdY = canvas.height / 2;
+      birdVelocity = 0;
+      birdFlap = false;
+
+      pipes = [];
+      frame = 0;
+      score = 0;
+      gameOverFlag = false;
+      requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === ' ' && gameOverFlag) {
+        startScreen.style.display = 'block'; // إظهار شاشة البداية بعد الخسارة
+        cancelAnimationFrame(gameLoop); // إيقاف اللعبة
+      } else {
+        birdFlap = true;
+      }
+    });
+
+    // إضافة دعم اللمس
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (gameOverFlag) {
+        startScreen.style.display = 'block'; // إظهار شاشة البداية بعد الخسارة
+        cancelAnimationFrame(gameLoop); // إيقاف اللعبة
+      } else {
+        birdFlap = true;
+      }
+    });
+
+    function drawBird() {
+      ctx.fillStyle = 'yellow';
+      ctx.fillRect(50, birdY, BIRD_WIDTH, BIRD_HEIGHT);
+    }
+
+    function drawPipes() {
+      pipes.forEach(pipe => {
+        ctx.fillStyle = 'green';
+        ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.top);
+        ctx.fillRect(pipe.x, canvas.height - pipe.bottom, PIPE_WIDTH, pipe.bottom);
+      });
+    }
+
+    function movePipes() {
+      pipes.forEach(pipe => {
+        pipe.x -= PIPE_SPEED;
+      });
+      if (pipes[0] && pipes[0].x + PIPE_WIDTH <= 0) {
+        pipes.shift();
+        score++;
+      }
+    }
+
+    function generatePipes() {
+      if (frame % SPAWN_RATE === 0) {
+        const pipeHeight = Math.floor(Math.random() * (canvas.height - PIPE_SPACING - 40)) + 40; // ضمان عدم وضع الأنابيب قريبًا جدًا من حافة الشاشة
+        pipes.push({
+          x: canvas.width,
+          top: pipeHeight,
+          bottom: canvas.height - pipeHeight - PIPE_SPACING,
+        });
+      }
+    }
+
+    function checkCollisions() {
+      // التصادم مع الأنابيب
+      for (const pipe of pipes) {
+        if (50 + BIRD_WIDTH > pipe.x && 50 < pipe.x + PIPE_WIDTH) {
+          if (birdY < pipe.top || birdY + BIRD_HEIGHT > canvas.height - pipe.bottom) {
+            return true;
+          }
+        }
+      }
+
+      // التصادم مع الأرض أو السماء
+      if (birdY <= 0 || birdY + BIRD_HEIGHT >= canvas.height) {
+        return true;
+      }
+
+      return false;
+    }
+
+    function updateBird() {
+      if (birdFlap) {
+        birdVelocity = FLAP;
+        birdFlap = false;
+      }
+      birdVelocity += GRAVITY;
+      birdY += birdVelocity;
+    }
+
+    function drawScore() {
+      ctx.fillStyle = 'black';
+      ctx.font = '20px Arial';
+      ctx.fillText('Score: ' + score, 10, 30);
+    }
+
+    function gameOver() {
+      ctx.fillStyle = 'black';
+      ctx.font = '30px Arial';
+      ctx.fillText('Game Over', canvas.width / 4, 50); // نقل "Game Over" إلى الجزء العلوي
+      ctx.fillText('Press Space or Tap to Restart', canvas.width / 4, 80); // النص الذي يخبر اللاعبين بإعادة البدء
+    }
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (checkCollisions()) {
+        gameOverFlag = true;
+        gameOver();
+        return;
+      }
+
+      drawBird();
+      movePipes();
+      generatePipes();
+      drawPipes();
+      updateBird();
+      drawScore();
+
+      frame++;
+      requestAnimationFrame(gameLoop);
+    }
+  </script>
+</body>
+</html>
